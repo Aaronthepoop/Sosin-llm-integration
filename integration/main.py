@@ -11,8 +11,7 @@ from transformers import BertForQuestionAnswering, BertTokenizer, T5ForCondition
 
 # Initialize OpenAI client
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Load the API key from environment variable
-client = OpenAI(api_key='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')
-
+client = OpenAI(api_key='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')
 # Constants
 OUTPUT_DIR = "static"
 if not os.path.exists(OUTPUT_DIR):
