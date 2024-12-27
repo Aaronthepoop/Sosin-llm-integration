@@ -1,12 +1,17 @@
+import os
 import torch
 import openai
 from transformers import BertForQuestionAnswering, BertTokenizer, T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
 from datasets import load_dataset
+from dotenv import load_dotenv
 
-# OpenAI API Key Setup (Replace with your OpenAI API Key)
-openai.api_key = 'your_openai_api_key_here'
+# Load environment variables from .env file
+load_dotenv()
 
-# Loading and fine-tuning BERT for Question Answering
+# OpenAI API Key Setup
+openai.api_key = os.getenv('OPENAI_API_KEY')
+
+# Function to fine-tune BERT for Question Answering
 def fine_tune_bert():
     # Load dataset (use a custom dataset or the SQuAD dataset)
     dataset = load_dataset("squad")
@@ -57,7 +62,7 @@ def fine_tune_bert():
     return model_bert, tokenizer_bert
 
 
-# Fine-tuning T5 for Explanation Generation
+# Function to fine-tune T5 for Explanation Generation
 def fine_tune_t5():
     # Load dataset (You can replace it with your custom explanation dataset)
     dataset = load_dataset("your_custom_explanation_dataset")
@@ -100,7 +105,7 @@ def fine_tune_t5():
     return model_t5, tokenizer_t5
 
 
-# Using OpenAI API to generate MCQs
+# Function to generate MCQs with OpenAI API
 def generate_mcq_with_openai(prompt):
     response = openai.Completion.create(
         engine="text-davinci-003",  # Or use a fine-tuned version
@@ -112,7 +117,7 @@ def generate_mcq_with_openai(prompt):
     return response.choices[0].text.strip()
 
 
-# Integrate all models together
+# Main function to integrate all models together
 def main():
     # Fine-tuning BERT for question answering
     model_bert, tokenizer_bert = fine_tune_bert()
@@ -121,7 +126,7 @@ def main():
     model_t5, tokenizer_t5 = fine_tune_t5()
 
     # Test: Generate an MCQ using OpenAI
-    prompt = "Generate a multiple choice question about climate change."
+    prompt = "Generate a multiple-choice question about climate change."
     mcq = generate_mcq_with_openai(prompt)
     print(f"Generated MCQ: {mcq}")
 
