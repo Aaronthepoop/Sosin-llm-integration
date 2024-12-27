@@ -1,0 +1,7 @@
+Question: Which of the following locations was the capital of the Maurya Kingdom?
+A) Pataliputra
+B) Taxila
+C) Ujjain
+D) Kalinga
+Explanation: Pataliputra was the capital of the Maurya Kingdom, as shown on the map.
+Content Path: static/generated_table.xlsx

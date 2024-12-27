@@ -1,158 +1,155 @@
-import os
+
 import torch
-import openai
-from transformers import BertForQuestionAnswering, BertTokenizer, T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
-from datasets import load_dataset
-from dotenv import load_dotenv
+from openai import OpenAI, OpenAIError, RateLimitError
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import pandas as pd
+import os
+import time
+from transformers import BertForQuestionAnswering, BertTokenizer, T5ForConditionalGeneration, T5Tokenizer
 
-# Load environment variables from .env file
-load_dotenv()
+# Initialize OpenAI client
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Load the API key from environment variable
+client = OpenAI(api_key='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')
 
-# OpenAI API Key Setup
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Constants
+OUTPUT_DIR = "static"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
-# Function to fine-tune BERT for Question Answering
 def fine_tune_bert():
-    # Load dataset (use a custom dataset or the SQuAD dataset)
-    dataset = load_dataset("squad")
-    
-    # Load pre-trained BERT model and tokenizer
-    model_bert = BertForQuestionAnswering.from_pretrained("bert-large-uncased")
-    tokenizer_bert = BertTokenizer.from_pretrained("bert-large-uncased")
+    """Initialize BERT for question answering."""
+    model = BertForQuestionAnswering.from_pretrained('bert-large-uncased')
+    tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+    return model, tokenizer
 
-    # Tokenize the dataset
-    def tokenize_function(examples):
-        return tokenizer_bert(
-            examples["question"], examples["context"], truncation=True, padding="max_length", max_length=512
-        )
-
-    tokenized_datasets = dataset.map(tokenize_function, batched=True)
-
-    # Format the dataset for BERT (necessary for QA tasks)
-    tokenized_datasets = tokenized_datasets.map(
-        lambda x: {"start_positions": x["answers"]["answer_start"][0], "end_positions": x["answers"]["answer_start"][0] + len(x["answers"]["text"][0])},
-        batched=True,
-    )
-
-    # Set up training arguments
-    training_args = TrainingArguments(
-        output_dir="./results_bert",
-        evaluation_strategy="epoch",
-        learning_rate=3e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=3,
-        weight_decay=0.01,
-        logging_dir="./logs",
-    )
-
-    # Initialize Trainer
-    trainer_bert = Trainer(
-        model=model_bert,
-        args=training_args,
-        train_dataset=tokenized_datasets["train"],
-        eval_dataset=tokenized_datasets["validation"],
-    )
-
-    # Fine-tune BERT
-    trainer_bert.train()
-    model_bert.save_pretrained('./fine_tuned_bert')
-    tokenizer_bert.save_pretrained('./fine_tuned_bert')
-
-    return model_bert, tokenizer_bert
-
-
-# Function to fine-tune T5 for Explanation Generation
 def fine_tune_t5():
-    # Load dataset (You can replace it with your custom explanation dataset)
-    dataset = load_dataset("your_custom_explanation_dataset")
+    """Initialize T5 for explanation generation."""
+    model = T5ForConditionalGeneration.from_pretrained('t5-large')
+    tokenizer = T5Tokenizer.from_pretrained('t5-large')
+    return model, tokenizer
 
-    # Load pre-trained T5 model and tokenizer
-    model_t5 = T5ForConditionalGeneration.from_pretrained("t5-large")
-    tokenizer_t5 = T5Tokenizer.from_pretrained("t5-large")
+def generate_mcq_with_openai(prompt, retries=3):
+    """Generate MCQ using OpenAI API."""
+    for attempt in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",  # Updated to GPT-4
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        except RateLimitError as e:
+            print(f"Rate limit exceeded: {e}. Retrying {retries - attempt - 1} more times.")
+            time.sleep(60)
+        except OpenAIError as e:
+            print(f"OpenAI error: {e}")
+            break
+    return None
 
-    # Tokenize the dataset
-    def tokenize_function(examples):
-        return tokenizer_t5(examples["input_text"], truncation=True, padding="max_length", max_length=512)
+def generate_map():
+    """Create a map using Matplotlib and Cartopy."""
+    fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={'projection': ccrs.PlateCarree()})
+    ax.set_extent([68, 97, 8, 37], crs=ccrs.PlateCarree())
 
-    tokenized_datasets = dataset.map(tokenize_function, batched=True)
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.RIVERS, edgecolor='blue')
 
-    # Set up training arguments
-    training_args = TrainingArguments(
-        output_dir="./results_t5",
-        evaluation_strategy="epoch",
-        learning_rate=3e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=3,
-        weight_decay=0.01,
-        logging_dir="./logs",
-    )
+    locations = {
+        'Pataliputra': (85.144, 25.611),
+        'Taxila': (72.836, 33.737),
+        'Ujjain': (75.784, 23.179),
+        'Kalinga': (85.833, 20.936)
+    }
+    for location, (lon, lat) in locations.items():
+        ax.plot(lon, lat, 'ro', transform=ccrs.PlateCarree())
+        ax.text(lon + 0.5, lat, location, transform=ccrs.PlateCarree())
 
-    # Initialize Trainer
-    trainer_t5 = Trainer(
-        model=model_t5,
-        args=training_args,
-        train_dataset=tokenized_datasets["train"],
-        eval_dataset=tokenized_datasets["validation"],
-    )
+    plt.title('Major Locations of the Maurya Kingdom')
+    map_path = os.path.join(OUTPUT_DIR, "generated_map.png")
+    plt.savefig(map_path)
+    plt.close()
+    return map_path
 
-    # Fine-tune T5
-    trainer_t5.train()
-    model_t5.save_pretrained('./fine_tuned_t5')
-    tokenizer_t5.save_pretrained('./fine_tuned_t5')
+def generate_table():
+    """Create a table and save as Excel file."""
+    data = {
+        'Location': ['Pataliputra', 'Taxila', 'Ujjain', 'Kalinga'],
+        'Longitude': [85.144, 72.836, 75.784, 85.833],
+        'Latitude': [25.611, 33.737, 23.179, 20.936]
+    }
+    df = pd.DataFrame(data)
+    table_path = os.path.join(OUTPUT_DIR, "generated_table.xlsx")
+    df.to_excel(table_path, index=False)
+    return table_path
 
-    return model_t5, tokenizer_t5
+def classify_content_type(question, retries=3):
+    """Classify the question into map, table, or image."""
+    prompt = f"Classify the following question into one of the categories: map, table, image.\n\nQuestion: {question}\n\nContent type:"
+    for attempt in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",  # Updated to GPT-4
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content.strip().lower()
+        except RateLimitError as e:
+            print(f"Rate limit exceeded: {e}. Retrying {retries - attempt - 1} more times.")
+            time.sleep(60)
+        except OpenAIError as e:
+            print(f"OpenAI error: {e}")
+            break
+    return "unknown"
 
+def create_mcq_with_content(question, options, explanation, content_type):
+    """Generate content based on classified type and save the MCQ."""
+    if content_type == 'map':
+        content_path = generate_map()
+    elif content_type == 'table':
+        content_path = generate_table()
+    else:
+        raise ValueError("Unsupported content type")
 
-# Function to generate MCQs with OpenAI API
-def generate_mcq_with_openai(prompt):
-    response = openai.Completion.create(
-        engine="text-davinci-003",  # Or use a fine-tuned version
-        prompt=prompt,
-        max_tokens=150,
-        n=1,
-        stop=["\n"]
-    )
-    return response.choices[0].text.strip()
+    mcq_path = os.path.join(OUTPUT_DIR, "mcq_question.txt")
+    with open(mcq_path, 'w') as f:
+        f.write(f"Question: {question}\n")
+        for option in options:
+            f.write(f"{option}\n")
+        f.write(f"Explanation: {explanation}\n")
+        f.write(f"Content Path: {content_path}\n")
 
+    return mcq_path, content_path
 
-# Main function to integrate all models together
 def main():
-    # Fine-tuning BERT for question answering
+    # Initialize models
     model_bert, tokenizer_bert = fine_tune_bert()
-
-    # Fine-tuning T5 for explanation generation
     model_t5, tokenizer_t5 = fine_tune_t5()
 
-    # Test: Generate an MCQ using OpenAI
+    # Generate MCQ using OpenAI
     prompt = "Generate a multiple-choice question about climate change."
     mcq = generate_mcq_with_openai(prompt)
     print(f"Generated MCQ: {mcq}")
 
-    # Example of using BERT to verify the answer
-    context = "Climate change refers to long-term changes in the temperature and weather patterns. It can be caused by human activity or natural processes."
-    question = "What is climate change?"
-    inputs = tokenizer_bert(question, context, return_tensors="pt")
+    # Example MCQ question and options
+    question = "Which of the following locations was the capital of the Maurya Kingdom?"
+    options = ["A) Pataliputra", "B) Taxila", "C) Ujjain", "D) Kalinga"]
+    explanation = "Pataliputra was the capital of the Maurya Kingdom, as shown on the map."
 
-    outputs = model_bert(**inputs)
-    start_scores = outputs.start_logits
-    end_scores = outputs.end_logits
+    # Classify content type
+    content_type = classify_content_type(question)
+    print(f"Classified content type: {content_type}")
 
-    all_tokens = tokenizer_bert.convert_ids_to_tokens(inputs["input_ids"][0])
-    start_token = torch.argmax(start_scores)
-    end_token = torch.argmax(end_scores)
-
-    print(f"Answer from BERT: {''.join(all_tokens[start_token:end_token+1])}")
-
-    # Example of using T5 to generate an explanation
-    input_text = f"Explain the concept of {question}."
-    inputs_t5 = tokenizer_t5(input_text, return_tensors="pt", padding=True, truncation=True)
-
-    outputs_t5 = model_t5.generate(inputs_t5["input_ids"])
-    explanation = tokenizer_t5.decode(outputs_t5[0], skip_special_tokens=True)
-
-    print(f"Explanation from T5: {explanation}")
+    # Create MCQ with associated content
+    mcq_path, content_path = create_mcq_with_content(question, options, explanation, content_type)
+    print(f"MCQ saved to {mcq_path}")
+    print(f"Content saved to {content_path}")
 
 if __name__ == "__main__":
     main()
