@@ -99,8 +99,9 @@ def classify_content_type(question, retries=3):
                     {"role": "user", "content": prompt}
                 ]
             )
-            return response.choices[0].message.content.strip().lower()
-        except RateLimitError as e:
+            content_type = response.choices[0].message.content.strip().lower()
+            print(f"Debug: classify_content_type output: {content_type}")  # Debug Statement
+            return content_type
             print(f"Rate limit exceeded: {e}. Retrying {retries - attempt - 1} more times.")
             time.sleep(60)
         except OpenAIError as e:
@@ -115,6 +116,7 @@ def create_mcq_with_content(question, options, explanation, content_type):
     elif content_type == 'table':
         content_path = generate_table()
     else:
+        print(f"Error: Unsupported content type '{content_type}'")  # Debug Statement
         raise ValueError("Unsupported content type")
 
     mcq_path = os.path.join(OUTPUT_DIR, "mcq_question.txt")
@@ -147,6 +149,7 @@ def main():
     print(f"Classified content type: {content_type}")
 
     # Create MCQ with associated content
+    print(f"Debug: Classified content type is '{content_type}'")  # Debug Statement
     mcq_path, content_path = create_mcq_with_content(question, options, explanation, content_type)
     print(f"MCQ saved to {mcq_path}")
     print(f"Content saved to {content_path}")
