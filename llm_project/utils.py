@@ -21,7 +21,9 @@ def tokenize_input(input_text):
     return tokenized_input
 
 
-import openai
+from openai import OpenAI
+
+client = OpenAI()
 from transformers import BertForSequenceClassification, T5ForConditionalGeneration
 import torch
 from django.conf import settings
@@ -31,11 +33,9 @@ model_bert = BertForSequenceClassification.from_pretrained(settings.BERT_MODEL_P
 model_t5 = T5ForConditionalGeneration.from_pretrained(settings.T5_MODEL_PATH)
 
 def generate_mcq(question):
-    response = openai.Completion.create(
-        model="text-davinci-003",  # Or use your specific OpenAI model
-        prompt=question,
-        max_tokens=150
-    )
+    response = client.completions.create(model="text-davinci-003",  # Or use your specific OpenAI model
+    prompt=question,
+    max_tokens=150)
     return response.choices[0].text.strip()
 
 def verify_answer(answer, question):

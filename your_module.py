@@ -1,5 +1,7 @@
 import os
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 from datasets import load_dataset
 from transformers import BertTokenizer, T5Tokenizer, Trainer, TrainingArguments, BertForQuestionAnswering, T5ForConditionalGeneration
 from dotenv import load_dotenv
@@ -10,7 +12,6 @@ from datasets import Dataset
 load_dotenv()
 
 # OpenAI API Key Setup
-openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def load_and_preprocess_bert_dataset(dataset_path):
     dataset = load_dataset('json', data_files=dataset_path)
@@ -97,13 +98,11 @@ def generate_mcq_with_openai(dataset_path):
 
     for example in dataset['train']:
         prompt = example['prompt']
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=150,
-            n=1,
-            stop=["\n"]
-        )
+        response = client.completions.create(engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=150,
+        n=1,
+        stop=["\n"])
         mcq = response.choices[0].text.strip()
         print(f"Generated MCQ: {mcq}")
 

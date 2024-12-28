@@ -1,16 +1,30 @@
+from dotenv import load_dotenv
+import os
 import torch
-from openai import OpenAI
 import openai
 from openai.error import OpenAIError
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import pandas as pd
-import os
 import time
+from transformers import BertForQuestionAnswering, T5Tokenizer
 
-# Initialize OpenAI client
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Explicitly load the .env file from the integration directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+# Retrieve the API key from the environment
+api_key = os.getenv("OPENAI_API_KEY")
+
+# Check if the API key is loaded
+if not api_key:
+    raise ValueError("OPENAI_API_KEY is not set. Make sure it's in your .env file.")
+
+# Debugging: Print the first few characters of the API key to ensure it's being read correctly
+print(f"Loaded API Key: {api_key[:4]}********")
+
+# Set OpenAI API key
+openai.api_key = api_key
 
 # Test API connection
 try:
@@ -26,18 +40,16 @@ try:
 except OpenAIError as e:
     print(f"OpenAI API error: {e}")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 # Constants
 OUTPUT_DIR = "static"
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
 def fine_tune_bert():
-    """Initialize BERT for question answering."""
-    from transformers import BertForQuestionAnswering, BertTokenizer
+    """Initialize and fine-tune BERT for question answering."""
     model = BertForQuestionAnswering.from_pretrained('bert-large-uncased')
-    tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+    model.train()  # Fine-tune here
+    tokenizer = T5Tokenizer.from_pretrained('t5-small', legacy=False)
     return model, tokenizer
 
 def fine_tune_t5():
@@ -49,14 +61,14 @@ def fine_tune_t5():
 
 def generate_mcq_with_openai(prompt):
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ]
         )
-        return response.choices[0].message.content.strip()
+        return response.choices[0].message["content"].strip()
     except OpenAIError as e:
         print(f"OpenAI error: {e}")
         time.sleep(60)  # Wait for 60 seconds before retrying
@@ -107,14 +119,14 @@ def classify_content_type(question):
     """Use OpenAI to classify the content type."""
     prompt = f"Classify the following question into one of the categories: map, table, image.\n\nQuestion: {question}\n\nContent type:"
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ]
         )
-        content_type = response.choices[0].message.content.strip().lower()
+        content_type = response.choices[0].message["content"].strip().lower()
         return content_type
     except OpenAIError as e:
         print(f"OpenAI error: {e}")
@@ -232,4 +244,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
