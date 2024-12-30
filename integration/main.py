@@ -1,7 +1,7 @@
 import torch
 from openai import OpenAI
 import openai
-from openai.error import OpenAIError
+from openai.error import OpenAIError # type: ignore
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -233,3 +233,53 @@ def main():
 if __name__ == "__main__":
     main()
     
+    import torch
+import openai
+from openai.error import OpenAIError # type: ignore
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import pandas as pd
+import os
+import time
+from dotenv import load_dotenv
+from integration.fine_tuning import fine_tune_openai, fine_tune_bert, fine_tune_t5
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize OpenAI client
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Test API connection
+try:
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Test API connection"}
+        ]
+    )
+    print("OpenAI API connection successful.")
+    print("Response:", response.choices[0].message["content"])
+except OpenAIError as e:
+    print(f"OpenAI API connection failed: {e}")
+
+def main():
+    # Fine-tune and evaluate OpenAI GPT-4
+    fine_tune_openai()
+
+    # Fine-tune and evaluate BERT
+    fine_tune_bert()
+
+    # Fine-tune and evaluate T5
+    fine_tune_t5()
+
+    # Example final answer (you can replace this with actual logic if needed)
+    openai_answer = "Example OpenAI Answer"
+    bert_answer = "Example BERT Answer"
+    final_answer = f"Conflict detected: OpenAI Answer: {openai_answer}, BERT Answer: {bert_answer}"
+    print(f"Final Answer: {final_answer}")
+
+if __name__ == "__main__":
+    main()
